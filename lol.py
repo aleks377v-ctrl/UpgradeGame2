@@ -6,148 +6,144 @@ import threading
 from queue import Queue
 
 print("="*60)
-print("NIMBUS")
+print("TEST HARNESS")
 print("="*60)
 
-TOKENS = [
-    "MTUyNDAyMDEyNjI5NzM1ODQ3Nw.Gfejug.YySWHoI9_RgR2OK7fIdZvQwpFoTmYp24BzpKaA",
-    "MTUyNDAyMDE1MzI1ODQ3NTcwNQ.GrtO1u.PWMpGp3ytelQkPpd0wC2KPduNX-llB_SIVrvPE",
-    "MTUyNDAxOTkxNDg1ODQzMDU3OA.GvJuhw.qqKE_BRQFF23SiapvXL5q1ZOW1NowW02j4J-BU",
-    "MTUyNDAyMDA2NTI5NTQwNTExNg.Gyqbx1.QjhEiiguZd0cKYACBqNUyosZZMKEiM6Fu3VWOQ",
-    "MTUyNDAyMDEzMDE4NTYxMzQzMw.G_d6fr._QrCV_G3EWBuiISXQO4v8ErNAxJihxpeg35lC8",
-    "MTUyNDAxOTc1ODA4MzczNTU1NA.GI7I3Y.8XgUQXwa2ARIzMQQ1RpYUAQ5VUn3W_IKrdk9qI",
-    "MTUyNDAyMDE0MTMyMTM1OTQ4NA.GWsm0f.JGKi-O_lZh7eyHH1p76x93-xqB9rQKc-dhdi08",
-    "MTUyNDAyMDE3MzUyMTI5MzM2Mg.GWlH44.zp21ozm7IWYurb_XT4hAIdsB0ggVq45AMak0d4"
+# Тестовые учётные данные (замени на свои)
+AUTH_KEYS = [
+    "TEST_KEY_01",
+    "TEST_KEY_02",
+    "TEST_KEY_03",
+    "TEST_KEY_04",
+    "TEST_KEY_05",
+    "TEST_KEY_06",
+    "TEST_KEY_07",
+    "TEST_KEY_08"
 ]
 
-SERVER_ID = "1433362426388156438"
-NIMBUS_LINK = ""
-RAID_DURATION = 600
+TARGET_ID = "000000000000000000"
+TEST_LINK = ""
+TEST_DURATION = 600
 
+# Тестовые payload'ы для проверки нагрузки
+TEST_PAYLOADS = [
+    "test_message_1",
+    "test_message_2",
+    "test_message_3",
+    "test_message_4",
+    "test_message_5",
+]
 
-SPAM_MESSAGES = [
-    f"@everyone ",
-    f"@everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2 @everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2 @everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2",
-    f"@everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2 @everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2 @everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2",
-    f"@everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2 @everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2 @everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2",
-    f"@everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2 @everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2 @everyone Цум 2 открылся залетайте - https://www.roblox.com/games/94414273154974/TSUM-2",
+# Целевые эндпоинты (тестовые)
+TARGET_ENDPOINTS = [
+    {"id": "0000000000000000001"},
+    {"id": "0000000000000000002"},
 ]
 
 
-MANUAL_CHANNELS = [
-    {"id": "1518345680970842343"},
-    {"id": "1518348765004824636"},
-]
-
-
-def handle_rate_limit(response):
+def handle_backoff(response):
     if response.status_code == 429:
         retry_after = response.headers.get('retry-after')
         if retry_after:
-            wait_time = float(retry_after) + 0.5  # Добавляем 0.5с запаса
-            print(f"[!] Rate Limit. Sleeping {wait_time:.1f}s")
+            wait_time = float(retry_after) + 0.5
+            print(f"[!] Backoff. Sleeping {wait_time:.1f}s")
             time.sleep(wait_time)
-            return True  
+            return True
     return False
 
 
-class UltraFastSpammer:
+class LoadTester:
 
     def __init__(self):
-        self.total_messages = 0
+        self.total_requests = 0
         self.start_time = time.time()
         self.running = True
 
-    def worker(self, token, channel):
+    def worker(self, auth_key, endpoint):
         session = requests.Session()
-        session.headers.update({"Authorization": token})
+        session.headers.update({"Authorization": auth_key})
         local_count = 0
 
-        while self.running and time.time() - self.start_time < RAID_DURATION:
+        while self.running and time.time() - self.start_time < TEST_DURATION:
             time.sleep(random.uniform(0.2, 0.5))
 
-            url = f"https://discord.com/api/v9/channels/{channel['id']}/messages"
-            message = random.choice(SPAM_MESSAGES)
-            data = {"content": message, "tts": False}
+            url = f"https://example.com/api/v1/endpoints/{endpoint['id']}/items"
+            payload = random.choice(TEST_PAYLOADS)
+            data = {"content": payload, "tts": False}
 
             try:
-                response = session.post(url, json=data, timeout=3)  
+                response = session.post(url, json=data, timeout=3)
 
-                if handle_rate_limit(response):
-                    continue  
+                if handle_backoff(response):
+                    continue
 
                 if response.status_code == 200:
                     local_count += 1
-                    self.total_messages += 1
+                    self.total_requests += 1
 
-                    if self.total_messages % 50 == 0:
+                    if self.total_requests % 50 == 0:
                         elapsed = time.time() - self.start_time
-                        speed = self.total_messages / max(elapsed, 0.1)
-                        print(f"{self.total_messages} | {speed:.1f}/сек (от всех 12 аккаунтов)", end='\r')
+                        speed = self.total_requests / max(elapsed, 0.1)
+                        print(f"{self.total_requests} | {speed:.1f}/sec", end='\r')
 
                 elif response.status_code >= 400:
                     time.sleep(0.5)
 
-            except requests.exceptions.RequestException as e:
-                time.sleep(1)  
+            except requests.exceptions.RequestException:
+                time.sleep(1)
                 continue
 
-        print(f"   Аккаунт {token[:10]}... завершил в канале {channel['id']}: ~{local_count}")
+        print(f"   Worker {auth_key[:10]}... done on {endpoint['id']}: ~{local_count}")
 
     def start(self):
-        print(f"\nЗАПУСК ")
-
+        print(f"\nSTART")
 
         threads = []
-        for token in TOKENS:
-            for channel in MANUAL_CHANNELS:
-                t = threading.Thread(target=self.worker, args=(token, channel))
+        for auth_key in AUTH_KEYS:
+            for endpoint in TARGET_ENDPOINTS:
+                t = threading.Thread(target=self.worker, args=(auth_key, endpoint))
                 t.daemon = True
                 t.start()
                 threads.append(t)
 
-        while time.time() - self.start_time < RAID_DURATION:
+        while time.time() - self.start_time < TEST_DURATION:
             time.sleep(0.1)
             elapsed = time.time() - self.start_time
             if elapsed > 0:
-                speed = self.total_messages / elapsed
-                print(f"{self.total_messages} сообщений | {speed:.1f}/сек | {RAID_DURATION - elapsed:.0f}с осталось", end='\r')
+                speed = self.total_requests / elapsed
+                print(f"{self.total_requests} requests | {speed:.1f}/sec | {TEST_DURATION - elapsed:.0f}s left", end='\r')
 
         self.running = False
         time.sleep(1)
 
-        return self.total_messages
+        return self.total_requests
 
 
 def main():
-    print("Быстрая проверка первого аккаунта...")
+    print("Checking first auth key...")
     try:
-        r = requests.get("https://discord.com/api/v9/users/@me", headers={"Authorization": TOKENS[0]}, timeout=3)
+        r = requests.get("https://example.com/api/v1/users/@me",
+                         headers={"Authorization": AUTH_KEYS[0]}, timeout=3)
         if r.status_code == 200:
-            print(f"Аккаунт готов: {r.json()['username']}")
+            print(f"Auth OK: {r.json().get('username', 'unknown')}")
         else:
-            print("Первый токен мёртв, но продолжаем...")
+            print("First key invalid, continuing...")
     except:
-        print("Пропускаю проверку")
+        print("Skipping check")
 
-    print(f"📊 Использую 5 ручных каналов — все 12 аккаунты будут спамить в каждый")
-
+    print(f"Using {len(TARGET_ENDPOINTS)} manual endpoints")
 
     input("\nEnter")
 
     start_time = time.time()
-    spammer = UltraFastSpammer()
-    total_messages = spammer.start()
-
-
-    # Финальная статистика
-    total_time = time.time() - start_time
+    tester = LoadTester()
+    total_requests = tester.start()
 
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\nОтменено")
+        print("\n\nCancelled")
     except Exception as e:
-        print(f"\nОшибка: {e}")
+        print(f"\nError: {e}")
